@@ -2,9 +2,12 @@
 // Netlify Serverless Function: Securely Save User Logs & Biometrics
 // -----------------------------------------------------------------
 
-const { getStore } = require("@netlify/blobs");
+const { getStore, connectLambda } = require("@netlify/blobs");
 
 exports.handler = async (event, context) => {
+  // Initialize the Netlify Blobs environment in Lambda compatibility mode
+  connectLambda(event);
+
   const user = context.clientContext && context.clientContext.user;
   
   if (!user) {
