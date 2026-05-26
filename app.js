@@ -72,17 +72,18 @@ let state = {
 };
 
 // -----------------------------------------------------------------
-// Initialization
+// Initialization & Identity Listeners
 // -----------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
   loadData();
   setupPhotoDropzone();
+  setupIdentityListeners();
   renderDashboard();
   renderHistory();
   renderSettingsQuestions();
 });
 
-// Load state from LocalStorage
+// Load local state initially
 function loadData() {
   const savedQuestions = localStorage.getItem("selfcoach_questions_v3");
   if (savedQuestions) {
@@ -92,6 +93,7 @@ function loadData() {
     saveQuestions();
   }
 
+  // Load from local storage as a robust fallback
   const savedCheckins = localStorage.getItem("selfcoach_checkins_v3");
   state.checkins = savedCheckins ? JSON.parse(savedCheckins) : [];
 
@@ -130,6 +132,139 @@ function saveBiometrics() {
 
 function getFormattedDate(ts) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// -----------------------------------------------------------------
+// Netlify Identity Cloud Sync
+// -----------------------------------------------------------------
+function setupIdentityListeners() {
+  if (window.netlifyIdentity) {
+    // Initial load check
+    window.netlifyIdentity.on("init", user => {
+      updateIdentityUI(user);
+      if (user) {
+        syncFromCloud(user);
+      }
+    });
+
+    // Login event
+    window.netlifyIdentity.on("login", user => {
+      showToast("Logged in successfully!", "success");
+      updateIdentityUI(user);
+      syncFromCloud(user);
+      window.netlifyIdentity.close();
+    });
+
+    // Logout event
+    window.netlifyIdentity.on("logout", () => {
+      showToast("Logged out successfully.", "info");
+      updateIdentityUI(null);
+      
+      // Reset state and re-load local storage data
+      state.checkins = [];
+      state.biometrics = [];
+      loadData();
+      renderDashboard();
+      renderHistory();
+    });
+  }
+}
+
+function updateIdentityUI(user) {
+  const container = document.getElementById("identity-footer-container");
+  if (!container) return;
+
+  if (!user) {
+    container.innerHTML = `
+      <button class="btn btn-primary" onclick="window.netlifyIdentity.open()" style="width: 100%; font-size: 0.72rem; padding: 0.6rem 0.5rem; letter-spacing: 0.02em;">
+        Log In / Join Cloud
+      </button>
+    `;
+  } else {
+    const email = user.email;
+    const name = user.user_metadata?.full_name || email.split("@")[0];
+    const initials = name.substring(0, 2).toUpperCase();
+    
+    container.innerHTML = `
+      <div class="user-avatar" id="sidebar-avatar">${initials}</div>
+      <div class="user-info" style="flex: 1; min-width: 0;">
+        <span class="user-name" id="sidebar-username" style="font-size:0.75rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase;">${name}</span>
+        <a href="#" onclick="window.netlifyIdentity.logout(); return false;" style="font-size:0.68rem; color:var(--error); font-weight:900; text-transform:uppercase; text-decoration:none; margin-top:2px; display:inline-block;">Log Out</a>
+      </div>
+    `;
+  }
+}
+
+// Fetch logs securely from Netlify Serverless API & Netlify Blobs
+async function syncFromCloud(user) {
+  if (!user) return;
+  
+  showToast("Syncing with Netlify Cloud...", "info");
+  
+  try {
+    const token = await window.netlifyIdentity.currentUser().jwt();
+    const res = await fetch("/.netlify/functions/get-logs", {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      
+      // Override local state if cloud data has records
+      if (data.checkins && data.biometrics) {
+        state.checkins = data.checkins;
+        state.biometrics = data.biometrics;
+        
+        // Back up to LocalStorage
+        saveCheckins();
+        saveBiometrics();
+        
+        renderDashboard();
+        renderHistory();
+        showToast("Synchronized with Cloud!", "success");
+      }
+    } else {
+      showToast("Cloud sync failed.", "error");
+    }
+  } catch (err) {
+    console.error("Cloud synchronization error: ", err);
+    showToast("Network error syncing with cloud.", "error");
+  }
+}
+
+// Push local logs securely to Netlify Serverless API & Netlify Blobs
+async function syncToCloud() {
+  const user = window.netlifyIdentity && window.netlifyIdentity.currentUser();
+  if (!user) {
+    // If not logged in, just save locally (already handled)
+    return;
+  }
+
+  try {
+    const token = await user.jwt();
+    const res = await fetch("/.netlify/functions/save-logs", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        checkins: state.checkins,
+        biometrics: state.biometrics
+      })
+    });
+
+    if (res.status === 200) {
+      showToast("Cloud Database Synced!", "success");
+    } else {
+      console.error("Save logs API failed:", await res.text());
+      showToast("Could not back up to Cloud database.", "error");
+    }
+  } catch (err) {
+    console.error("Error syncing to cloud API: ", err);
+  }
 }
 
 // -----------------------------------------------------------------
@@ -217,6 +352,9 @@ function saveBiometricsLog(event) {
   saveBiometrics();
   showToast("Waking vitals log saved!", "success");
 
+  // Sync to Netlify Blobs instantly!
+  syncToCloud();
+
   document.getElementById("biometrics-quick-form").reset();
   renderDashboard();
 }
@@ -226,6 +364,10 @@ function deleteBiometricEntry(timestamp) {
     state.biometrics = state.biometrics.filter(b => b.timestamp !== timestamp);
     saveBiometrics();
     showToast("Vital entry deleted.", "info");
+    
+    // Sync deletion to cloud!
+    syncToCloud();
+
     renderDashboard();
   }
 }
@@ -239,7 +381,7 @@ function drawSvgChart(containerId, dataPoints, dataKey, strokeColor, labelText, 
 
   if (dataPoints.length < 2) {
     container.innerHTML = `
-      <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: hsl(var(--text-dim)); font-size: 0.9rem;">
+      <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 0.9rem;">
         Log at least 2 entries to render the ${labelText} trend line.
       </div>
     `;
@@ -248,7 +390,7 @@ function drawSvgChart(containerId, dataPoints, dataKey, strokeColor, labelText, 
 
   const values = dataPoints.map(dp => dp[dataKey]).filter(v => v !== null && v !== undefined);
   if (values.length < 2) {
-    container.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center; color: hsl(var(--text-dim));">Insufficient data points.</div>`;
+    container.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-dim);">Insufficient data points.</div>`;
     return;
   }
 
@@ -284,8 +426,8 @@ function drawSvgChart(containerId, dataPoints, dataKey, strokeColor, labelText, 
     const y = paddingY + (i / numGridLines) * chartHeight;
     const gridVal = maxVal - (i / numGridLines) * valRange;
     gridLinesHtml += `
-      <line x1="${paddingX}" y1="${y}" x2="${width - paddingX}" y2="${y}" stroke="hsl(var(--border-color) / 0.4)" stroke-dasharray="4" />
-      <text x="${paddingX - 8}" y="${y + 4}" fill="hsl(var(--text-dim))" font-size="9" text-anchor="end">${gridVal.toFixed(1)}</text>
+      <line x1="${paddingX}" y1="${y}" x2="${width - paddingX}" y2="${y}" stroke="var(--border-color)" stroke-dasharray="4" />
+      <text x="${paddingX - 8}" y="${y + 4}" fill="var(--text-dim)" font-size="9" text-anchor="end">${gridVal.toFixed(1)}</text>
     `;
   }
 
@@ -295,14 +437,14 @@ function drawSvgChart(containerId, dataPoints, dataKey, strokeColor, labelText, 
     const labelY = height - 8;
     
     elementsHtml += `
-      <circle cx="${coord.x}" cy="${coord.y}" r="4" fill="${strokeColor}" stroke="hsl(var(--bg-card))" stroke-width="1.5" class="chart-point" data-value="${coord.value}" data-date="${coord.date}">
+      <circle cx="${coord.x}" cy="${coord.y}" r="4" fill="${strokeColor}" stroke="var(--bg-card)" stroke-width="1.5" class="chart-point" data-value="${coord.value}" data-date="${coord.date}">
         <title>${labelText}: ${coord.value} (${coord.date})</title>
       </circle>
     `;
 
     if (showLabel) {
       elementsHtml += `
-        <text x="${coord.x}" y="${labelY}" fill="hsl(var(--text-dim))" font-size="9" text-anchor="middle">${coord.date}</text>
+        <text x="${coord.x}" y="${labelY}" fill="var(--text-dim)" font-size="9" text-anchor="middle">${coord.date}</text>
       `;
     }
   });
@@ -420,15 +562,6 @@ function saveCustomQuestion(event) {
   document.getElementById("custom-question-form").reset();
   toggleCustomInputPlaceholder();
   renderSettingsQuestions();
-}
-
-function deleteCustomQuestion(questionId) {
-  if (confirm("Are you sure you want to delete this custom metric?")) {
-    state.questions = state.questions.filter(q => q.id !== questionId);
-    saveQuestions();
-    showToast("Custom metric deleted.", "info");
-    renderSettingsQuestions();
-  }
 }
 
 // -----------------------------------------------------------------
@@ -561,13 +694,13 @@ function renderActiveWizardStep() {
       <label for="wizard-value-number" style="font-weight: 700; margin-bottom: 0.5rem; display:block;">Logged Value</label>
       <div style="display: flex; align-items: center; gap: 0.5rem;">
         <input type="number" id="wizard-value-number" class="form-input" style="flex:1;" placeholder="Enter value" value="${rawVal}" step="any">
-        <span style="font-weight: 700; font-family: var(--font-display); font-size:1.1rem; padding: 0.5rem 1rem; border-radius: 8px; background-color: hsl(var(--bg-deep)); border:1px solid hsl(var(--border-color));">${currentQ.placeholder || 'Units'}</span>
+        <span style="font-weight: 700; font-family: var(--font-display); font-size:1.1rem; padding: 0.5rem 1rem; border-radius: 8px; background-color: var(--bg-deep); border:1px solid var(--border-color);">${currentQ.placeholder || 'Units'}</span>
       </div>
     `;
   } else {
     inputBlock.innerHTML = `
       <label style="font-weight: 700; margin-bottom: 0.5rem; display:block;">Subjective Review</label>
-      <p style="color: hsl(var(--text-muted)); font-size: 0.85rem; font-style: italic;">Provide fully exhaustive notes in the notes section below.</p>
+      <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">Provide fully exhaustive notes in the notes section below.</p>
       <input type="hidden" id="wizard-value-text" value="text_entry">
     `;
   }
@@ -733,7 +866,96 @@ function finishCheckin() {
   saveCheckins();
   
   showToast("Weekly check-in logged and parsed successfully!", "success");
+  
+  // Sync full database to Netlify Blobs!
+  syncToCloud();
+
   switchView("dashboard");
+}
+
+// -----------------------------------------------------------------
+// High-Fidelity Heuristic AI Virtual Coach Feedback Generator
+// -----------------------------------------------------------------
+function generateCoachFeedback(answers, overallScore, vitals) {
+  let insights = [];
+
+  // 1. Overall Score Assessment
+  const score = parseFloat(overallScore);
+  if (!isNaN(score)) {
+    if (score >= 8.5) {
+      insights.push("🚀 Systemic recovery stands in an elite baseline. Physiology is highly receptive to progressive overload. Continue driving current intensity with full confidence.");
+    } else if (score >= 6.5) {
+      insights.push("⚖️ Physiological adaptive capacity is moderately strained. Focus on minor nutritional compliance or sleep hygiene corrections. Maintain load but avoid excessive volume spikes.");
+    } else {
+      insights.push("⚠️ CRITICAL RECOVERY WARNING: Systemic autonomic stress is high. CNS output and recovery baseline are compromised. Recommend a scheduled deload or a 15% reduction in training volume to prevent overreaching.");
+    }
+  }
+
+  // 2. Vitals Analysis (if available)
+  if (vitals) {
+    // HRV analysis
+    if (vitals.hrv && vitals.hrv < 55) {
+      insights.push("📉 Waking HRV is depressed, indicating heightened sympathetic (fight-or-flight) nervous system dominance. Prioritize parasympathetic activation: integrate 5-10 minutes of box breathing post-training and ensure a 2-hour buffer between your last meal and sleep.");
+    } else if (vitals.hrv && vitals.hrv >= 70) {
+      insights.push("📈 Strong HRV baseline detected. Autonomic nervous system is highly balanced, showing excellent parasympathetic tone. Excellent window for high-intensity stimulation or maximum effort training.");
+    }
+
+    // Resting Heart Rate
+    if (vitals.rhr && vitals.rhr > 60) {
+      insights.push("💓 Resting Heart Rate is slightly elevated above your elite baseline. This often correlates with systemic fatigue, late-night digestion, or early immune response. Monitor closely over the next 48 hours.");
+    }
+
+    // Fasting Glucose
+    if (vitals.glucose && vitals.glucose > 98) {
+      insights.push("🩸 Waking glucose is elevated (>98 mg/dL). This could be driven by elevated cortisol, poor sleep quality, or a late-night carbohydrate-heavy meal. Try shifting your last meal earlier or reducing late-night carbohydrate density.");
+    }
+
+    // Blood Pressure
+    if (vitals.bpSystolic && (vitals.bpSystolic > 125 || vitals.bpDiastolic > 82)) {
+      insights.push("🩺 Blood Pressure shows mild elevation. Ensure adequate hydration, check electrolyte balance (sodium-to-potassium ratio), and integrate mindfulness exercises to manage systemic stress.");
+    }
+
+    // Caffeine & Sleep link
+    if (vitals.caffeine && vitals.caffeine > 300) {
+      const sleepAns = answers["q-sleep"];
+      if (sleepAns && parseInt(sleepAns.value) < 7) {
+        insights.push("☕ High daily caffeine intake (>300mg) is coupled with a lower sleep quality rating. Recommend setting a strict caffeine cutoff at 12:00 PM to prevent adenosis-receptor disruption during deep sleep stages.");
+      }
+    }
+
+    // Hydration
+    if (vitals.hydration && vitals.hydration < 100) {
+      insights.push("💧 Daily hydration level is below the 100oz high-performance threshold. Adequate cellular hydration is critical for muscle protein synthesis, joint lubrication, and cognitive clarity. Increase fluid intake.");
+    }
+  }
+
+  // 3. Subjective Domain Pillars from Answers
+  const sleep = answers["q-sleep"];
+  if (sleep && parseInt(sleep.value) < 6) {
+    insights.push("🛌 Sleep architecture is compromised. Ensure your sleep chamber is completely dark, cool (65-68°F), and free of blue-light emitting devices 1 hour prior to sleep.");
+  }
+
+  const soreness = answers["q-soreness"];
+  if (soreness && parseInt(soreness.value) < 6) {
+    insights.push("💥 Elevated muscular soreness (DOMS) reported. Focus on light active recovery (e.g. 20-min low-intensity zone 1 cardio), localized heat application, and ensure daily protein intakes are hit to support tissue repair.");
+  }
+
+  const stress = answers["q-stress"];
+  if (stress && parseInt(stress.value) < 6) {
+    insights.push("🧠 High non-training cognitive load detected. High cortisol levels from life stressors compete directly with physical adaptation. Prioritize time-blocking, meditation, or a brief walk in nature.");
+  }
+
+  const digestion = answers["q-digestion"];
+  if (digestion && parseInt(digestion.value) < 6) {
+    insights.push("🦠 Digestive irregularities or discomfort reported. Audit recent food sources for potential inflammatory triggers, focus on eating slowly, and consider incorporating fermented foods or digestive enzymes.");
+  }
+
+  // Fallback if no specific insights generated
+  if (insights.length === 0) {
+    insights.push("✨ All tracked vital markers and subjective recovery pillars are in stable alignment. Continue with current training progressions, active nutrition protocols, and lifestyle habits.");
+  }
+
+  return insights.join("\n\n");
 }
 
 // -----------------------------------------------------------------
@@ -842,56 +1064,15 @@ function removeUploadedPhoto(idx) {
 }
 
 // -----------------------------------------------------------------
-// High-Level Coaching Insights Engine (Data-Based Trends)
+// Settings & Deletion Helpers
 // -----------------------------------------------------------------
-function generateCoachFeedback(answers, overallScore, vitals) {
-  let feedback = "";
-  const sleepAns = answers["q-sleep"];
-  const stressAns = answers["q-stress"];
-  const digestionAns = answers["q-digestion"];
-
-  const parsedScore = parseFloat(overallScore);
-
-  if (isNaN(parsedScore)) {
-    return "Data parameters filed. Monitor 7-day rolling biometric baselines in the home dashboard to track homeostasis.";
+function deleteCustomQuestion(questionId) {
+  if (confirm("Are you sure you want to delete this custom metric?")) {
+    state.questions = state.questions.filter(q => q.id !== questionId);
+    saveQuestions();
+    showToast("Custom metric deleted.", "info");
+    renderSettingsQuestions();
   }
-
-  if (parsedScore >= 8.2) {
-    feedback += "DATA INDICATOR: Optimal adaptation. Your subjective indices indicate robust sympathetic-parasympathetic balance. Systemic capacities support high load absorptions.";
-  } else if (parsedScore >= 6.0) {
-    feedback += "DATA INDICATOR: Stable adaptation under current parameters. Marginal recovery deficiencies exist. Maintain focus on baseline nutrient density and circadian structures.";
-  } else {
-    feedback += "DATA WARNING: Systemic accumulation overload. Objective performance limits are compromised by high DOMS or stress values. Prioritize deload protocols.";
-  }
-
-  // Evaluate complex vitals parameters in the notes!
-  if (vitals) {
-    if (vitals.hrv && vitals.hrv < 55) {
-      feedback += `\n\nBIOMETRIC ALERT: Autonomic RMSSD HRV is suppressed at ${vitals.hrv}ms. Deep nervous system fatigue is active. Keep overall life/training load moderate today.`;
-    }
-    if (vitals.bpSystolic && vitals.bpSystolic > 130) {
-      feedback += `\n\nBIOMETRIC ALERT: Blood Pressure is slightly elevated at ${vitals.bpSystolic}/${vitals.bpDiastolic} mmHg. Monitor sodium levels, active life stressors, and pre-waking sleep latency.`;
-    }
-    if (vitals.glucose && vitals.glucose > 105) {
-      feedback += `\n\nBIOMETRIC ALERT: Fasting waking glucose is high at ${vitals.glucose} mg/dL. Monitor late carbohydrate timing and systemic cortisol levels.`;
-    }
-    if (vitals.calories && vitals.calories < 1800) {
-      feedback += `\n\nNUTRITION ALERT: Calorie intake is critically low (${vitals.calories} kcal) for active recovery parameters. Expand fueling margin.`;
-    }
-    if (vitals.steps && vitals.steps < 5000) {
-      feedback += `\n\nNEAT ALERT: Activity volume is severely suppressed at ${vitals.steps} steps. Focus on active restoration walks.`;
-    }
-  }
-
-  if (sleepAns && parseInt(sleepAns.value) < 6) {
-    feedback += `\n\nRECOVERY GAP: Sleep score of ${sleepAns.value}/10 is a major barrier. Minimize screen illumination 90m pre-sleep and target bedroom temperature < 67°F.`;
-  }
-
-  if (digestionAns && parseInt(digestionAns.value) < 6) {
-    feedback += `\n\nDIGESTION OUTLIER: Gut comfort is suppressed. Verify food allergen exposures, track hydration levels, and check meal timing relative to physical training sessions.`;
-  }
-
-  return feedback;
 }
 
 // -----------------------------------------------------------------
@@ -918,6 +1099,22 @@ function renderDashboard() {
   document.getElementById("stat-avg-score").innerText = avgScore;
   document.getElementById("stat-photos-uploaded").innerText = totalPhotos;
 
+  // Dynamically update welcome message with logged-in user name
+  const user = window.netlifyIdentity && window.netlifyIdentity.currentUser();
+  if (user) {
+    const name = user.user_metadata?.full_name || user.email.split("@")[0];
+    document.getElementById("dashboard-welcome").innerText = `Welcome back, ${name}`;
+  } else {
+    document.getElementById("dashboard-welcome").innerText = "Welcome back, Athlete";
+  }
+
+  // Dynamically update latest check-in insights
+  if (state.checkins.length > 0) {
+    document.getElementById("dashboard-insight-text").innerText = state.checkins[0].insights;
+  } else {
+    document.getElementById("dashboard-insight-text").innerText = "Submit your weekly check-in or daily vitals to view performance metrics analysis.";
+  }
+
   renderBiometricsQuickList();
 
   if (state.biometrics.length > 0) {
@@ -928,7 +1125,6 @@ function renderDashboard() {
 
     const latest = state.biometrics[state.biometrics.length - 1];
 
-    // Compute rolling 7-day averages for advanced vitals
     let avgSteps = 0, avgCal = 0, avgHydra = 0, stepsCount = 0, calCount = 0, hydraCount = 0;
     
     state.biometrics.slice(-7).forEach(b => {
@@ -981,7 +1177,6 @@ function renderDashboard() {
       </div>
     `;
 
-    // Glucose and Caffeine snapshots
     if (latest.glucose) {
       trendsContainer.innerHTML += `
         <div class="metric-pill">
@@ -1002,13 +1197,14 @@ function renderDashboard() {
       trendsContainer.innerHTML += `
         <div class="metric-pill">
           <span>Subjective Energy:</span>
-          <span class="metric-pill-val" style="color: hsl(var(--success));">${latest.energy}/10</span>
+          <span class="metric-pill-val" style="color: var(--success);">${latest.energy}/10</span>
         </div>
       `;
     }
 
   } else {
-    document.getElementById("dashboard-welcome").innerText = "Welcome, Athlete";
+    const name = user ? (user.user_metadata?.full_name || user.email.split("@")[0]) : "Athlete";
+    document.getElementById("dashboard-welcome").innerText = `Welcome, ${name}`;
     document.getElementById("dashboard-insight-text").innerText = "Log your first weekly check-in or submit daily morning weight and HRV statistics below to view rolling baseline trends.";
   }
 
@@ -1020,7 +1216,7 @@ function renderBiometricsQuickList() {
   if (!listContainer) return;
 
   if (state.biometrics.length === 0) {
-    listContainer.innerHTML = `<p style="color: hsl(var(--text-dim)); font-size:0.85rem; font-style:italic;">No biometric records. Submit morning values above.</p>`;
+    listContainer.innerHTML = `<p style="color: var(--text-dim); font-size:0.85rem; font-style:italic;">No biometric records. Submit morning values above.</p>`;
     return;
   }
 
@@ -1030,7 +1226,7 @@ function renderBiometricsQuickList() {
     <div style="overflow-x: auto;">
       <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; min-width: 500px;">
         <thead>
-          <tr style="border-bottom: 1px solid hsl(var(--border-color)); color: hsl(var(--text-dim)); font-weight: 600;">
+          <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-dim); font-weight: 600;">
             <th style="padding: 0.5rem 0;">Date</th>
             <th style="padding: 0.5rem 0;">Weight</th>
             <th style="padding: 0.5rem 0;">HRV</th>
@@ -1046,10 +1242,10 @@ function renderBiometricsQuickList() {
   reverseList.forEach(b => {
     const bpStr = b.bpSystolic ? `${b.bpSystolic}/${b.bpDiastolic}` : '--';
     html += `
-      <tr style="border-bottom: 1px solid hsl(var(--border-color) / 0.5);">
+      <tr style="border-bottom: 1px solid rgba(92, 245, 216, 0.08);">
         <td style="padding: 0.5rem 0; font-weight:600;">${b.date}</td>
         <td style="padding: 0.5rem 0;">${b.weight}</td>
-        <td style="padding: 0.5rem 0; color: hsl(var(--primary)); font-weight:700;">${b.hrv} ms</td>
+        <td style="padding: 0.5rem 0; color: var(--primary); font-weight:700;">${b.hrv} ms</td>
         <td style="padding: 0.5rem 0;">${bpStr}</td>
         <td style="padding: 0.5rem 0;">${b.calories ? b.calories.toLocaleString() + ' kcal' : '--'}</td>
         <td style="padding: 0.5rem 0;">${b.steps ? b.steps.toLocaleString() : '--'}</td>
@@ -1072,7 +1268,7 @@ function renderComparativeMatrix() {
 
   if (state.checkins.length < 2) {
     container.innerHTML = `
-      <div style="padding: 1.5rem; text-align:center; color: hsl(var(--text-dim)); font-size:0.9rem;">
+      <div style="padding: 1.5rem; text-align:center; color: var(--text-dim); font-size:0.9rem;">
         Log at least 2 check-ins to build a side-by-side weekly comparative data matrix.
       </div>
     `;
@@ -1093,7 +1289,7 @@ function renderComparativeMatrix() {
     if (q.type !== "scale" && q.type !== "binary") return;
 
     rowsHtml += `
-      <tr style="border-bottom: 1px solid hsl(var(--border-color) / 0.5);">
+      <tr style="border-bottom: 1px solid rgba(92, 245, 216, 0.08);">
         <td style="padding: 0.75rem; font-weight: 500; font-size: 0.85rem;">
           <span class="badge badge-${q.domain}" style="font-size:0.65rem; margin-right: 0.5rem;">${q.domain}</span>
           ${q.title}
@@ -1103,16 +1299,16 @@ function renderComparativeMatrix() {
     recentCheckins.forEach(log => {
       const ans = log.answers[q.id];
       let valStr = "--";
-      let cellColor = "hsl(var(--text-muted))";
+      let cellColor = "var(--text-muted)";
 
       if (ans) {
         if (q.type === "scale") {
           valStr = `${ans.value}/10`;
           const score = parseInt(ans.value);
-          cellColor = score >= 8 ? "hsl(var(--success))" : score >= 5.5 ? "hsl(var(--warning))" : "hsl(var(--error))";
+          cellColor = score >= 8 ? "var(--success)" : score >= 5.5 ? "var(--warning)" : "var(--error)";
         } else if (q.type === "binary") {
           valStr = ans.value.toUpperCase();
-          cellColor = ans.value === "yes" ? "hsl(var(--success))" : "hsl(var(--error))";
+          cellColor = ans.value === "yes" ? "var(--success)" : "var(--error)";
         }
       }
 
@@ -1124,18 +1320,18 @@ function renderComparativeMatrix() {
 
   // Overall Score Row
   rowsHtml += `
-    <tr style="border-bottom: 2px solid hsl(var(--border-color)); font-weight: 700; background-color: hsl(var(--bg-deep) / 0.3);">
+    <tr style="border-bottom: 2px solid var(--border-color); font-weight: 700; background-color: rgba(8, 18, 25, 0.35);">
       <td style="padding: 0.75rem; font-size: 0.85rem; color: #fff;">Overall Check-In Score</td>
   `;
   recentCheckins.forEach(log => {
-    rowsHtml += `<td style="padding: 0.75rem; text-align:center; font-size: 0.9rem; color: hsl(var(--secondary));">${log.overallScore}/10</td>`;
+    rowsHtml += `<td style="padding: 0.75rem; text-align:center; font-size: 0.9rem; color: var(--secondary);">${log.overallScore}/10</td>`;
   });
   rowsHtml += `</tr>`;
 
   // Weight snapshots
   rowsHtml += `
-    <tr style="border-bottom: 1px solid hsl(var(--border-color) / 0.5); font-weight: 500;">
-      <td style="padding: 0.75rem; font-size: 0.85rem; color: hsl(var(--text-muted));">Biometric Body Weight</td>
+    <tr style="border-bottom: 1px solid rgba(92, 245, 216, 0.08); font-weight: 500;">
+      <td style="padding: 0.75rem; font-size: 0.85rem; color: var(--text-muted);">Biometric Body Weight</td>
   `;
   recentCheckins.forEach(log => {
     const wt = log.vitalsSnapshot ? `${log.vitalsSnapshot.weight} lbs/kg` : "Not Filed";
@@ -1145,19 +1341,19 @@ function renderComparativeMatrix() {
 
   // HRV snapshots
   rowsHtml += `
-    <tr style="border-bottom: 1px solid hsl(var(--border-color) / 0.5); font-weight: 500;">
-      <td style="padding: 0.75rem; font-size: 0.85rem; color: hsl(var(--text-muted));">Morning HRV RMSSD</td>
+    <tr style="border-bottom: 1px solid rgba(92, 245, 216, 0.08); font-weight: 500;">
+      <td style="padding: 0.75rem; font-size: 0.85rem; color: var(--text-muted);">Morning HRV RMSSD</td>
   `;
   recentCheckins.forEach(log => {
     const hrv = log.vitalsSnapshot ? `${log.vitalsSnapshot.hrv} ms` : "Not Filed";
-    rowsHtml += `<td style="padding: 0.75rem; text-align:center; font-size: 0.85rem; color: hsl(var(--primary)); font-weight:700;">${hrv}</td>`;
+    rowsHtml += `<td style="padding: 0.75rem; text-align:center; font-size: 0.85rem; color: var(--primary); font-weight:700;">${hrv}</td>`;
   });
   rowsHtml += `</tr>`;
 
   // BP snapshots
   rowsHtml += `
-    <tr style="border-bottom: 1px solid hsl(var(--border-color) / 0.5); font-weight: 500;">
-      <td style="padding: 0.75rem; font-size: 0.85rem; color: hsl(var(--text-muted));">Blood Pressure Snapshot</td>
+    <tr style="border-bottom: 1px solid rgba(92, 245, 216, 0.08); font-weight: 500;">
+      <td style="padding: 0.75rem; font-size: 0.85rem; color: var(--text-muted);">Blood Pressure Snapshot</td>
   `;
   recentCheckins.forEach(log => {
     const bp = log.vitalsSnapshot && log.vitalsSnapshot.bpSystolic ? `${log.vitalsSnapshot.bpSystolic}/${log.vitalsSnapshot.bpDiastolic} mmHg` : "--";
@@ -1167,8 +1363,8 @@ function renderComparativeMatrix() {
 
   // Calories snapshots
   rowsHtml += `
-    <tr style="border-bottom: 1px solid hsl(var(--border-color) / 0.5); font-weight: 500;">
-      <td style="padding: 0.75rem; font-size: 0.85rem; color: hsl(var(--text-muted));">Caloric Intake snapshot</td>
+    <tr style="border-bottom: 1px solid rgba(92, 245, 216, 0.08); font-weight: 500;">
+      <td style="padding: 0.75rem; font-size: 0.85rem; color: var(--text-muted);">Caloric Intake snapshot</td>
   `;
   recentCheckins.forEach(log => {
     const cal = log.vitalsSnapshot && log.vitalsSnapshot.calories ? `${log.vitalsSnapshot.calories.toLocaleString()} kcal` : "--";
@@ -1179,7 +1375,7 @@ function renderComparativeMatrix() {
   // Steps snapshots
   rowsHtml += `
     <tr style="font-weight: 500;">
-      <td style="padding: 0.75rem; font-size: 0.85rem; color: hsl(var(--text-muted));">Activity Level (Steps)</td>
+      <td style="padding: 0.75rem; font-size: 0.85rem; color: var(--text-muted);">Activity Level (Steps)</td>
   `;
   recentCheckins.forEach(log => {
     const steps = log.vitalsSnapshot && log.vitalsSnapshot.steps ? log.vitalsSnapshot.steps.toLocaleString() : "--";
@@ -1190,7 +1386,7 @@ function renderComparativeMatrix() {
   container.innerHTML = `
     <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
       <thead>
-        <tr style="border-bottom: 2px solid hsl(var(--border-color)); color: hsl(var(--text-dim)); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing:0.03em;">
+        <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-dim); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing:0.03em;">
           ${headersHtml}
         </tr>
       </thead>
@@ -1258,7 +1454,7 @@ function renderHistory() {
         ${mediaPreviewHtml}
         <div class="log-footer">
           <span>${log.photos ? log.photos.length : 0} photos attached</span>
-          <span style="color: hsl(var(--primary)); font-weight:700;">View Details &rarr;</span>
+          <span style="color: var(--secondary); font-weight:700;">View Details &rarr;</span>
         </div>
       </div>
     `;
@@ -1276,7 +1472,7 @@ function openLogModal(logId) {
 
   document.getElementById("modal-log-date").innerText = `Check-In: Week of ${log.date}`;
   const scoreDisplay = log.overallScore !== "N/A" ? `${log.overallScore}/10` : "Metrics Filed";
-  document.getElementById("modal-log-subtitle").innerHTML = `Overall Check-In Score: <span id="modal-log-score" style="font-weight:700; color:hsl(var(--secondary));">${scoreDisplay}</span>`;
+  document.getElementById("modal-log-subtitle").innerHTML = `Overall Check-In Score: <span id="modal-log-score" style="font-weight:700; color:var(--secondary);">${scoreDisplay}</span>`;
 
   const modalBody = document.getElementById("modal-log-body");
   modalBody.innerHTML = "";
@@ -1313,12 +1509,12 @@ function openLogModal(logId) {
   if (log.vitalsSnapshot) {
     const bioSnapCard = document.createElement("div");
     bioSnapCard.className = "coach-notes-card";
-    bioSnapCard.style.borderColor = "hsl(var(--secondary) / 0.3)";
-    bioSnapCard.style.background = "linear-gradient(135deg, hsl(var(--secondary-glow)), transparent)";
+    bioSnapCard.style.borderColor = "rgba(92, 245, 216, 0.22)";
+    bioSnapCard.style.background = "var(--secondary-glow)";
     
     let snapListHtml = `
       <li><strong>Weight:</strong> ${log.vitalsSnapshot.weight} lbs/kg</li>
-      <li><strong>HRV RMSSD:</strong> <span style="color: hsl(var(--primary)); font-weight:700;">${log.vitalsSnapshot.hrv} ms</span></li>
+      <li><strong>HRV RMSSD:</strong> <span style="color: var(--secondary); font-weight:700;">${log.vitalsSnapshot.hrv} ms</span></li>
     `;
     if (log.vitalsSnapshot.rhr) snapListHtml += `<li><strong>Resting Heart Rate:</strong> ${log.vitalsSnapshot.rhr} BPM</li>`;
     if (log.vitalsSnapshot.bpSystolic) snapListHtml += `<li><strong>Blood Pressure:</strong> ${log.vitalsSnapshot.bpSystolic}/${log.vitalsSnapshot.bpDiastolic} mmHg</li>`;
@@ -1330,7 +1526,7 @@ function openLogModal(logId) {
     if (log.vitalsSnapshot.energy) snapListHtml += `<li><strong>Waking Readiness:</strong> ${log.vitalsSnapshot.energy}/10</li>`;
 
     bioSnapCard.innerHTML = `
-      <h4 style="color: hsl(var(--secondary)); font-size: 0.95rem; font-weight:700; margin-bottom: 0.75rem;">Weekly Vitals Snapshot</h4>
+      <h4 style="color: var(--secondary); font-size: 0.95rem; font-weight:700; margin-bottom: 0.75rem;">Weekly Vitals Snapshot</h4>
       <ul style="list-style:none; font-size: 0.85rem; display: flex; flex-direction:column; gap:0.5rem;">
         ${snapListHtml}
       </ul>
@@ -1444,9 +1640,6 @@ function triggerCopyClipboard() {
   });
 }
 
-// -----------------------------------------------------------------
-// Text File Download
-// -----------------------------------------------------------------
 function triggerTextDownload() {
   const log = state.checkins.find(l => l.id === state.selectedLogId);
   if (!log) return;

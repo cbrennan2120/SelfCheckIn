@@ -6,6 +6,8 @@
   <title>Self-Coach // Elite Biometrics & Weekly Recovery Logs</title>
   <meta name="description" content="A high-fidelity biometric logging and tracking platform for self-coached performers.">
   <link rel="stylesheet" href="styles.css">
+  <!-- Netlify Identity Widget -->
+  <script type="text/javascript" src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
 
@@ -45,12 +47,8 @@
         </li>
       </ul>
       
-      <div class="sidebar-footer">
-        <div class="user-avatar" id="sidebar-avatar">SC</div>
-        <div class="user-info">
-          <span class="user-name" id="sidebar-username">Athlete Check-in</span>
-          <span class="user-role">Biometrics Hub</span>
-        </div>
+      <div class="sidebar-footer" id="identity-footer-container">
+        <!-- Injected dynamically by app.js depending on login status -->
       </div>
     </nav>
     

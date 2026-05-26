@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "A high-fidelity self-coaching weekly journal and log blog application.",
   "scripts": {
-    "dev": "npx -y serve ./"
+    "dev": "npx -y serve ./",
+    "netlify": "npx -y netlify-cli dev"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^2.1.0"
   },
   "keywords": [
     "coaching",
