@@ -1,0 +1,17 @@
+{
+  "name": "self-coach-checkin",
+  "version": "1.0.0",
+  "description": "A high-fidelity self-coaching weekly journal and log blog application.",
+  "scripts": {
+    "dev": "npx -y serve ./"
+  },
+  "keywords": [
+    "coaching",
+    "fitness",
+    "productivity",
+    "journal",
+    "dashboard"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}

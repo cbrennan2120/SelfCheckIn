@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Coach // Elite Biometrics & Weekly Recovery Logs</title>
+  <meta name="description" content="A high-fidelity biometric logging and tracking platform for self-coached performers.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="app-wrapper">
+    
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" aria-label="Main Navigation">
+      <a href="#" class="brand" onclick="switchView('dashboard')">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="brand-name">Self<span>Coach</span></div>
+      </a>
+      
+      <ul class="nav-menu">
+        <li class="nav-item">
+          <a href="#" class="nav-link active" id="nav-dashboard" onclick="switchView('dashboard')">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" id="nav-checkin" onclick="switchView('checkin')">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            New Check-In
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" id="nav-history" onclick="switchView('history')">
+            <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+            Weekly Logs
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" id="nav-settings" onclick="switchView('settings')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Coach Settings
+          </a>
+        </li>
+      </ul>
+      
+      <div class="sidebar-footer">
+        <div class="user-avatar" id="sidebar-avatar">SC</div>
+        <div class="user-info">
+          <span class="user-name" id="sidebar-username">Athlete Check-in</span>
+          <span class="user-role">Biometrics Hub</span>
+        </div>
+      </div>
+    </nav>
+    
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- DASHBOARD VIEW -->
+      <section id="view-dashboard" class="app-view active">
+        <header class="view-header">
+          <div class="view-title">
+            <h1 id="dashboard-welcome">Welcome back, Athlete</h1>
+            <p>High-fidelity visual biometrics logging and chronological baseline matrices.</p>
+          </div>
+          <button class="btn btn-primary" onclick="switchView('checkin')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Start Weekly Check-In
+          </button>
+        </header>
+        
+        <div class="stats-banner">
+          <div class="stat-item">
+            <div class="stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-total-checkins">0</span>
+              <span class="stat-label">Total Logs</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-icon" style="background-color: hsl(var(--secondary-glow)); color: hsl(var(--secondary));">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m8 12 4 4 6-6"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-avg-score">--</span>
+              <span class="stat-label">Average Check-in Rating</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-photos-uploaded">0</span>
+              <span class="stat-label">Attached Photos</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- BIOMETRICS LINE CHARTS GRID -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; margin-bottom: 2.5rem;">
+          <div class="glass-card">
+            <h2 class="card-title">
+              <span>Waking Body Weight Trend</span>
+              <span class="badge badge-physical" style="text-transform:lowercase; font-size:0.7rem;">lbs / kg</span>
+            </h2>
+            <div id="weight-chart-container" style="height: 180px; width: 100%; overflow: visible; padding-top: 10px;">
+              <!-- Dynamic SVG weight chart -->
+            </div>
+          </div>
+          <div class="glass-card">
+            <h2 class="card-title">
+              <span>Morning HRV RMSSD Trend</span>
+              <span class="badge badge-mental" style="text-transform:lowercase; font-size:0.7rem;">ms</span>
+            </h2>
+            <div id="hrv-chart-container" style="height: 180px; width: 100%; overflow: visible; padding-top: 10px;">
+              <!-- Dynamic SVG HRV chart -->
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid-dashboard">
+          
+          <!-- QUICK BIOMETRICS LOGGER (With all 12 parameters) -->
+          <div class="glass-card">
+            <h2 class="card-title">Quick Log Morning Vitals</h2>
+            <form id="biometrics-quick-form" onsubmit="saveBiometricsLog(event)">
+              
+              <h3 style="font-size:0.8rem; font-weight:700; color:hsl(var(--primary)); text-transform:uppercase; margin-bottom:0.75rem;">1. Core Baseline (Mandatory)</h3>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                <div class="form-group">
+                  <label for="bio-weight">Body Weight (lbs/kg)</label>
+                  <input type="number" id="bio-weight" class="form-input" placeholder="e.g. 182.4" step="any" required>
+                </div>
+                <div class="form-group">
+                  <label for="bio-hrv">HRV RMSSD (ms)</label>
+                  <input type="number" id="bio-hrv" class="form-input" placeholder="e.g. 72" required>
+                </div>
+              </div>
+              
+              <h3 style="font-size:0.8rem; font-weight:700; color:hsl(var(--secondary)); text-transform:uppercase; margin-bottom:0.75rem;">2. Physiological Vitals & Temp</h3>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
+                <div class="form-group">
+                  <label for="bio-rhr">Resting HR (BPM)</label>
+                  <input type="number" id="bio-rhr" class="form-input" placeholder="e.g. 54">
+                </div>
+                <div class="form-group">
+                  <label for="bio-glucose">Fasting Glucose (mg/dL)</label>
+                  <input type="number" id="bio-glucose" class="form-input" placeholder="e.g. 90">
+                </div>
+              </div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+                <div class="form-group">
+                  <label for="bio-bp-sys">BP Systolic</label>
+                  <input type="number" id="bio-bp-sys" class="form-input" placeholder="e.g. 120">
+                </div>
+                <div class="form-group">
+                  <label for="bio-bp-dia">BP Diastolic</label>
+                  <input type="number" id="bio-bp-dia" class="form-input" placeholder="e.g. 80">
+                </div>
+                <div class="form-group">
+                  <label for="bio-temp">Basal Temp</label>
+                  <input type="number" id="bio-temp" class="form-input" placeholder="e.g. 98.2" step="any">
+                </div>
+              </div>
+              
+              <h3 style="font-size:0.8rem; font-weight:700; color:hsl(var(--success)); text-transform:uppercase; margin-bottom:0.75rem;">3. Daily Lifestyle & Intake</h3>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
+                <div class="form-group">
+                  <label for="bio-steps">Steps Count</label>
+                  <input type="number" id="bio-steps" class="form-input" placeholder="e.g. 10000">
+                </div>
+                <div class="form-group">
+                  <label for="bio-hydra">Hydration (oz or L)</label>
+                  <input type="number" id="bio-hydra" class="form-input" placeholder="e.g. 120">
+                </div>
+              </div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                  <label for="bio-cal">Calories (kcal)</label>
+                  <input type="number" id="bio-cal" class="form-input" placeholder="e.g. 2500">
+                </div>
+                <div class="form-group">
+                  <label for="bio-caff">Caffeine (mg)</label>
+                  <input type="number" id="bio-caff" class="form-input" placeholder="e.g. 150">
+                </div>
+                <div class="form-group">
+                  <label for="bio-energy">Energy (1-10)</label>
+                  <input type="number" id="bio-energy" class="form-input" placeholder="1-10" min="1" max="10">
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 0.5rem;">Save Morning Vitals</button>
+            </form>
+            
+            <div style="margin-top: 2.5rem;">
+              <h3 style="font-size: 0.95rem; font-weight:700; margin-bottom:1rem; border-bottom: 1px solid hsl(var(--border-color)); padding-bottom:0.5rem; color: hsl(var(--text-muted));">Recent Biometric History</h3>
+              <div id="dashboard-biometrics-list">
+                <!-- Rendered dynamically by app.js -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- LATEST EVALUATION NOTES -->
+          <div class="glass-card">
+            <h2 class="card-title">Latest Check-In Biometric Insights</h2>
+            <div class="coach-insight-intro" style="border-left-color: hsl(var(--primary));">
+              <div class="coach-avatar" style="background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div>
+                <h4 style="margin-bottom: 0.25rem;">Physiological Balance Review</h4>
+                <p id="dashboard-insight-text" style="font-size: 0.88rem; line-height: 1.6; white-space: pre-line;">Submit your weekly check-in or daily vitals to view performance metrics analysis.</p>
+              </div>
+            </div>
+            <div class="insight-metric-pills" id="dashboard-metric-trends" style="margin-top: 1rem;">
+              <!-- Dynamic pills -->
+            </div>
+          </div>
+          
+          <!-- COMPARATIVE WEEK-OVER-WEEK DATA MATRIX -->
+          <div class="glass-card" style="grid-column: 1 / -1; margin-top: 1rem;">
+            <h2 class="card-title" style="margin-bottom:0.5rem;">
+              <span>Comparative Weekly Metrics Matrix</span>
+              <span class="badge badge-vitals">Chronological trends</span>
+            </h2>
+            <p style="color: hsl(var(--text-muted)); font-size: 0.85rem; margin-bottom: 1.5rem;">Visual comparison of your subjective check-in pillars and daily vitals snapshots side-by-side.</p>
+            <div id="dashboard-matrix-container" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+              <!-- Dynamic matrix rendered here by app.js -->
+            </div>
+          </div>
+          
+        </div>
+      </section>
+      
+      <!-- CHECK-IN PORTAL VIEW -->
+      <section id="view-checkin" class="app-view">
+        <header class="view-header">
+          <div class="view-title">
+            <h1>Weekly Log Check-In</h1>
+            <p>Perform your subjective recovery assessment to pair with your objective vital trends.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="cancelCheckin()">Cancel</button>
+        </header>
+        
+        <div class="checkin-flow">
+          <div class="progress-track" id="checkin-progress-bar">
+            <div class="progress-fill" id="checkin-progress-fill"></div>
+            <!-- Dynamic nodes -->
+          </div>
+          
+          <div class="coach-interface">
+            <div class="coach-bubble" style="box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-color: hsl(var(--primary) / 0.3);">
+              <div class="coach-header">
+                <div class="coach-avatar">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div class="coach-title" id="active-coach-domain">Sleep Quality</div>
+              </div>
+              <h3 class="coach-question-text" id="active-coach-question">Rate your sleep quality.</h3>
+              <p class="coach-prompt-detail" id="active-coach-prompt">Detail prompt</p>
+            </div>
+          </div>
+          
+          <div class="checkin-response-zone" id="response-input-zone">
+            <!-- Injected input -->
+          </div>
+          
+          <div class="checkin-navigation">
+            <button class="btn btn-secondary" id="btn-checkin-prev" onclick="prevQuestion()" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              Previous
+            </button>
+            <button class="btn btn-primary" id="btn-checkin-next" onclick="nextQuestion()">
+              Next Step
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- LOG HISTORY VIEW -->
+      <section id="view-history" class="app-view">
+        <header class="view-header">
+          <div class="view-title">
+            <h1>Weekly Log Archive</h1>
+            <p>Chronological performance logs and biometrics snapshots.</p>
+          </div>
+        </header>
+        <div id="logs-list-container">
+          <!-- List goes here -->
+        </div>
+      </section>
+      
+      <!-- COACH SETTINGS VIEW -->
+      <section id="view-settings" class="app-view">
+        <header class="view-header">
+          <div class="view-title">
+            <h1>Coach Settings</h1>
+            <p>Customize your active tracking metrics. Disable default questions or add custom metrics matching your tracking goals.</p>
+          </div>
+        </header>
+        
+        <div class="settings-container">
+          <div class="glass-card">
+            <h2 class="card-title">Active Metrics List</h2>
+            <div class="question-list" id="settings-questions-list">
+              <!-- settings metrics items -->
+            </div>
+          </div>
+          
+          <div class="glass-card">
+            <h2 class="card-title">Create Custom Metric</h2>
+            <form id="custom-question-form" onsubmit="saveCustomQuestion(event)">
+              <div class="form-group">
+                <label for="cq-title">Metric Name</label>
+                <input type="text" id="cq-title" class="form-input" placeholder="e.g. Daily Steps, Caffeine (mg)" required>
+              </div>
+              <div class="form-group">
+                <label for="cq-domain">Category</label>
+                <select id="cq-domain" class="form-input">
+                  <option value="physical">Physical load</option>
+                  <option value="nutrition">Nutrition & Fueling</option>
+                  <option value="mental">Mindset & Focus</option>
+                  <option value="vitals">Physiological vitals</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="cq-type">Format</label>
+                <select id="cq-type" class="form-input" onchange="toggleCustomInputPlaceholder()">
+                  <option value="scale">Rating Scale (1-10 Slider)</option>
+                  <option value="binary">Binary Option (Yes/No)</option>
+                  <option value="number">Raw Numerical Value</option>
+                  <option value="text">Subjective Journal Column</option>
+                </select>
+              </div>
+              <div class="form-group" id="cq-placeholder-group" style="display: none;">
+                <label for="cq-placeholder">Numerical Unit</label>
+                <input type="text" id="cq-placeholder" class="form-input" placeholder="e.g. mg, BPM, ml, steps">
+              </div>
+              <div class="form-group">
+                <label for="cq-prompt">Prompt Inquiry</label>
+                <textarea id="cq-prompt" class="form-input" placeholder="Define the parameters or questions you want to assess. e.g. Analyze your overall caffeine intakes, sleep patterns..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Create Custom Metric</button>
+            </form>
+          </div>
+        </div>
+      </section>
+      
+    </main>
+  </div>
+  
+  <!-- LOG DETAILS DIALOG overlay -->
+  <div class="log-modal" id="log-details-modal">
+    <div class="log-modal-content">
+      <div class="log-modal-header">
+        <div>
+          <h2 id="modal-log-date">Week of May 25, 2026</h2>
+          <p id="modal-log-subtitle" style="color: hsl(var(--text-muted)); font-size: 0.85rem; margin-top: 0.25rem;">Overall Rating: <span id="modal-log-score">9.5/10</span></p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeLogModal()" aria-label="Close dialog">Close</button>
+      </div>
+      <div class="log-modal-body" id="modal-log-body">
+        <!-- Content injected dynamically -->
+      </div>
+      <div class="log-modal-footer">
+        <button class="btn btn-accent" id="btn-modal-export" onclick="openExportDrawer()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          Export & Share Report
+        </button>
+        <button class="btn btn-secondary" onclick="closeLogModal()">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- SHARE EXPORT DRAWER OVERLAY -->
+  <div class="export-overlay" id="export-drawer">
+    <div class="export-card">
+      <div class="export-header">
+        <h3>Export Check-In Report</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeExportDrawer()">Cancel</button>
+      </div>
+      <p style="color: hsl(var(--text-muted)); font-size: 0.9rem; margin-bottom: 1.5rem;">Choose a high-fidelity format to share your check-in report with a coach or archive it locally.</p>
+      
+      <div class="export-options-grid">
+        <button class="export-option-btn" onclick="triggerCopyClipboard()">
+          <div class="export-option-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </div>
+          <div class="export-option-text">
+            <h4>Copy Markdown to Clipboard</h4>
+            <p>Perfect for dropping straight into Slack, Discord, or Email.</p>
+          </div>
+        </button>
+        
+        <button class="export-option-btn" onclick="triggerTextDownload()">
+          <div class="export-option-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <div class="export-option-text">
+            <h4>Download Plain Text File</h4>
+            <p>Saves a formatted check-in log (.txt) to your device.</p>
+          </div>
+        </button>
+        
+        <button class="export-option-btn" onclick="triggerPdfExport()">
+          <div class="export-option-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <div class="export-option-text">
+            <h4>Print or Save as PDF</h4>
+            <p>Triggers the print dial utilizing standard coach-styled layouts.</p>
+          </div>
+        </button>
+      </div>
+      
+      <button class="btn btn-secondary" style="width: 100%;" onclick="closeExportDrawer()">Cancel</button>
+    </div>
+  </div>
+  
+  <!-- TOAST CONTAINER FOR NOTIFICATIONS -->
+  <div class="toast-container" id="toast-container"></div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
