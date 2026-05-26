@@ -48,7 +48,9 @@
       </ul>
       
       <div class="sidebar-footer" id="identity-footer-container">
-        <!-- Injected dynamically by app.js depending on login status -->
+        <button class="btn btn-primary" onclick="if(window.netlifyIdentity){window.netlifyIdentity.open()}else{alert('Netlify Identity script is still loading. Please try again in a few seconds.')}" style="width: 100%; font-size: 0.72rem; padding: 0.6rem 0.5rem; letter-spacing: 0.02em;">
+          Log In / Join Cloud
+        </button>
       </div>
     </nav>
     

@@ -1321,7 +1321,13 @@ textarea.form-input {
     color: var(--secondary);
   }
   .sidebar-footer {
-    display: none;
+    display: flex;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
   }
   .main-content {
     margin-left: 0;

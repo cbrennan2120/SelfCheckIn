@@ -138,35 +138,51 @@ function getFormattedDate(ts) {
 // Netlify Identity Cloud Sync
 // -----------------------------------------------------------------
 function setupIdentityListeners() {
-  if (window.netlifyIdentity) {
-    // Initial load check
-    window.netlifyIdentity.on("init", user => {
-      updateIdentityUI(user);
-      if (user) {
+  const initIdentity = () => {
+    if (window.netlifyIdentity) {
+      // Initial load check
+      window.netlifyIdentity.on("init", user => {
+        updateIdentityUI(user);
+        if (user) {
+          syncFromCloud(user);
+        }
+      });
+
+      // Login event
+      window.netlifyIdentity.on("login", user => {
+        showToast("Logged in successfully!", "success");
+        updateIdentityUI(user);
         syncFromCloud(user);
+        window.netlifyIdentity.close();
+      });
+
+      // Logout event
+      window.netlifyIdentity.on("logout", () => {
+        showToast("Logged out successfully.", "info");
+        updateIdentityUI(null);
+        
+        // Reset state and re-load local storage data
+        state.checkins = [];
+        state.biometrics = [];
+        loadData();
+        renderDashboard();
+        renderHistory();
+      });
+      return true;
+    }
+    return false;
+  };
+
+  // Try to initialize immediately
+  if (!initIdentity()) {
+    // If not ready, poll every 100ms up to 50 times (5 seconds total) to bind once CDN script loads
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (initIdentity() || attempts >= 50) {
+        clearInterval(interval);
       }
-    });
-
-    // Login event
-    window.netlifyIdentity.on("login", user => {
-      showToast("Logged in successfully!", "success");
-      updateIdentityUI(user);
-      syncFromCloud(user);
-      window.netlifyIdentity.close();
-    });
-
-    // Logout event
-    window.netlifyIdentity.on("logout", () => {
-      showToast("Logged out successfully.", "info");
-      updateIdentityUI(null);
-      
-      // Reset state and re-load local storage data
-      state.checkins = [];
-      state.biometrics = [];
-      loadData();
-      renderDashboard();
-      renderHistory();
-    });
+    }, 100);
   }
 }
 
