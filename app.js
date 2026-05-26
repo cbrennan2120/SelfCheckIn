@@ -893,85 +893,87 @@ function finishCheckin() {
 // High-Fidelity Heuristic AI Virtual Coach Feedback Generator
 // -----------------------------------------------------------------
 function generateCoachFeedback(answers, overallScore, vitals) {
-  let insights = [];
+  let metrics = [];
 
-  // 1. Overall Score Assessment
+  // 1. Subjective Averages & Metrics
   const score = parseFloat(overallScore);
   if (!isNaN(score)) {
-    if (score >= 8.5) {
-      insights.push("🚀 Systemic recovery stands in an elite baseline. Physiology is highly receptive to progressive overload. Continue driving current intensity with full confidence.");
-    } else if (score >= 6.5) {
-      insights.push("⚖️ Physiological adaptive capacity is moderately strained. Focus on minor nutritional compliance or sleep hygiene corrections. Maintain load but avoid excessive volume spikes.");
-    } else {
-      insights.push("⚠️ CRITICAL RECOVERY WARNING: Systemic autonomic stress is high. CNS output and recovery baseline are compromised. Recommend a scheduled deload or a 15% reduction in training volume to prevent overreaching.");
-    }
+    metrics.push(`📊 Overall Weekly Score: ${score}/10`);
   }
 
-  // 2. Vitals Analysis (if available)
+  // 2. Waking Vitals Highlights
   if (vitals) {
-    // HRV analysis
-    if (vitals.hrv && vitals.hrv < 55) {
-      insights.push("📉 Waking HRV is depressed, indicating heightened sympathetic (fight-or-flight) nervous system dominance. Prioritize parasympathetic activation: integrate 5-10 minutes of box breathing post-training and ensure a 2-hour buffer between your last meal and sleep.");
-    } else if (vitals.hrv && vitals.hrv >= 70) {
-      insights.push("📈 Strong HRV baseline detected. Autonomic nervous system is highly balanced, showing excellent parasympathetic tone. Excellent window for high-intensity stimulation or maximum effort training.");
+    let vitalsList = [];
+    if (vitals.weight) vitalsList.push(`• Weight: ${vitals.weight} lbs/kg`);
+    if (vitals.hrv) {
+      const hrvStatus = vitals.hrv < 55 ? "🔴 Suppressed" : vitals.hrv >= 70 ? "🟢 Elevated/Strong" : "⚪ Normal";
+      vitalsList.push(`• HRV RMSSD: ${vitals.hrv} ms (${hrvStatus})`);
     }
-
-    // Resting Heart Rate
-    if (vitals.rhr && vitals.rhr > 60) {
-      insights.push("💓 Resting Heart Rate is slightly elevated above your elite baseline. This often correlates with systemic fatigue, late-night digestion, or early immune response. Monitor closely over the next 48 hours.");
+    if (vitals.rhr) {
+      const rhrStatus = vitals.rhr > 60 ? "🟡 Elevated" : "🟢 Normal";
+      vitalsList.push(`• Resting HR: ${vitals.rhr} BPM (${rhrStatus})`);
     }
-
-    // Fasting Glucose
-    if (vitals.glucose && vitals.glucose > 98) {
-      insights.push("🩸 Waking glucose is elevated (>98 mg/dL). This could be driven by elevated cortisol, poor sleep quality, or a late-night carbohydrate-heavy meal. Try shifting your last meal earlier or reducing late-night carbohydrate density.");
+    if (vitals.glucose) {
+      const glucoseStatus = vitals.glucose > 98 ? "🔴 Elevated" : "🟢 Normal";
+      vitalsList.push(`• Fasting Glucose: ${vitals.glucose} mg/dL (${glucoseStatus})`);
     }
-
-    // Blood Pressure
-    if (vitals.bpSystolic && (vitals.bpSystolic > 125 || vitals.bpDiastolic > 82)) {
-      insights.push("🩺 Blood Pressure shows mild elevation. Ensure adequate hydration, check electrolyte balance (sodium-to-potassium ratio), and integrate mindfulness exercises to manage systemic stress.");
+    if (vitals.bpSystolic) {
+      const bpStatus = (vitals.bpSystolic > 125 || vitals.bpDiastolic > 82) ? "🔴 Elevated" : "🟢 Normal";
+      vitalsList.push(`• Blood Pressure: ${vitals.bpSystolic}/${vitals.bpDiastolic} mmHg (${bpStatus})`);
     }
-
-    // Caffeine & Sleep link
-    if (vitals.caffeine && vitals.caffeine > 300) {
-      const sleepAns = answers["q-sleep"];
-      if (sleepAns && parseInt(sleepAns.value) < 7) {
-        insights.push("☕ High daily caffeine intake (>300mg) is coupled with a lower sleep quality rating. Recommend setting a strict caffeine cutoff at 12:00 PM to prevent adenosis-receptor disruption during deep sleep stages.");
-      }
+    if (vitals.temp) vitalsList.push(`• Basal Body Temp: ${vitals.temp} °F/°C`);
+    if (vitals.steps) {
+      const stepsStatus = vitals.steps < 10000 ? "🟡 Low Activity" : "🟢 Active";
+      vitalsList.push(`• Steps: ${vitals.steps.toLocaleString()} (${stepsStatus})`);
     }
+    if (vitals.hydration) {
+      const hydraStatus = vitals.hydration < 100 ? "🟡 Sub-optimal" : "🟢 Adequate";
+      vitalsList.push(`• Hydration: ${vitals.hydration} oz/L (${hydraStatus})`);
+    }
+    if (vitals.calories) vitalsList.push(`• Intake: ${vitals.calories.toLocaleString()} kcal`);
+    if (vitals.caffeine !== null && vitals.caffeine !== undefined) {
+      const caffStatus = vitals.caffeine > 300 ? "🟡 High Intake" : "🟢 Moderate";
+      vitalsList.push(`• Caffeine: ${vitals.caffeine} mg (${caffStatus})`);
+    }
+    if (vitals.energy) vitalsList.push(`• Waking Energy: ${vitals.energy}/10`);
 
-    // Hydration
-    if (vitals.hydration && vitals.hydration < 100) {
-      insights.push("💧 Daily hydration level is below the 100oz high-performance threshold. Adequate cellular hydration is critical for muscle protein synthesis, joint lubrication, and cognitive clarity. Increase fluid intake.");
+    if (vitalsList.length > 0) {
+      metrics.push(`📈 Waking Vitals Snapshot:\n${vitalsList.join("\n")}`);
     }
   }
 
-  // 3. Subjective Domain Pillars from Answers
+  // 3. Subjective Reflections
+  let reflections = [];
   const sleep = answers["q-sleep"];
-  if (sleep && parseInt(sleep.value) < 6) {
-    insights.push("🛌 Sleep architecture is compromised. Ensure your sleep chamber is completely dark, cool (65-68°F), and free of blue-light emitting devices 1 hour prior to sleep.");
-  }
-
+  if (sleep) reflections.push(`• Sleep Quality: ${sleep.value}/10 - "${sleep.comment}"`);
+  
   const soreness = answers["q-soreness"];
-  if (soreness && parseInt(soreness.value) < 6) {
-    insights.push("💥 Elevated muscular soreness (DOMS) reported. Focus on light active recovery (e.g. 20-min low-intensity zone 1 cardio), localized heat application, and ensure daily protein intakes are hit to support tissue repair.");
-  }
+  if (soreness) reflections.push(`• Muscle Recovery/DOMS: ${soreness.value}/10 - "${soreness.comment}"`);
 
   const stress = answers["q-stress"];
-  if (stress && parseInt(stress.value) < 6) {
-    insights.push("🧠 High non-training cognitive load detected. High cortisol levels from life stressors compete directly with physical adaptation. Prioritize time-blocking, meditation, or a brief walk in nature.");
-  }
+  if (stress) reflections.push(`• Life Stress/Cognitive Load: ${stress.value}/10 - "${stress.comment}"`);
 
   const digestion = answers["q-digestion"];
-  if (digestion && parseInt(digestion.value) < 6) {
-    insights.push("🦠 Digestive irregularities or discomfort reported. Audit recent food sources for potential inflammatory triggers, focus on eating slowly, and consider incorporating fermented foods or digestive enzymes.");
+  if (digestion) reflections.push(`• Digestion Comfort: ${digestion.value}/10 - "${digestion.comment}"`);
+
+  const nutrition = answers["q-nutrition"];
+  if (nutrition) reflections.push(`• Nutrition Adherence: ${nutrition.value}/10 - "${nutrition.comment}"`);
+
+  const reflection = answers["q-reflection"];
+  if (reflection && reflection.comment && reflection.comment.trim() && reflection.comment !== "text_entry") {
+    reflections.push(`• Tactical Reflections: "${reflection.comment.trim()}"`);
   }
 
-  // Fallback if no specific insights generated
-  if (insights.length === 0) {
-    insights.push("✨ All tracked vital markers and subjective recovery pillars are in stable alignment. Continue with current training progressions, active nutrition protocols, and lifestyle habits.");
+  if (reflections.length > 0) {
+    metrics.push(`📝 Subjective Pillars & Notes:\n${reflections.join("\n")}`);
   }
 
-  return insights.join("\n\n");
+  // Fallback if no data is present
+  if (metrics.length === 0) {
+    metrics.push("✨ Systemic recovery baseline is in stable alignment. Strict physiological parameters tracked.");
+  }
+
+  return metrics.join("\n\n");
 }
 
 // -----------------------------------------------------------------
@@ -1553,7 +1555,7 @@ function openLogModal(logId) {
   const notesCard = document.createElement("div");
   notesCard.className = "coach-notes-card";
   notesCard.innerHTML = `
-    <h4>Biometric Adaptation Warnings</h4>
+    <h4>Physiological Data & Reflections</h4>
     <p style="font-size:0.92rem; line-height:1.6; white-space: pre-line;">${log.insights}</p>
   `;
   rightCol.appendChild(notesCard);
